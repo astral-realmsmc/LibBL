@@ -2,15 +2,27 @@ pipeline {
     agent any
 
     tools {
-        gradle 'gradle'
         jdk '25'
+    }
+
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '20', artifactNumToKeepStr: '10'))
+        disableConcurrentBuilds()
+    }
+
+    environment {
+        GRADLE_OPTS = '-Dorg.gradle.daemon=false'
     }
 
     stages {
         stage('Checkout') {
             steps {
                 checkout scm
-                sh 'rm -f gradle.properties'
+                sh '''
+                    rm -f gradle.properties
+                    chmod +x gradlew
+                '''
             }
         }
 
@@ -21,7 +33,7 @@ pipeline {
                     usernameVariable: 'ORG_GRADLE_PROJECT_astralrealmsUsername',
                     passwordVariable: 'ORG_GRADLE_PROJECT_astralrealmsPassword'
                 )]) {
-                    sh 'gradle build'
+                    sh './gradlew --no-daemon --stacktrace build'
                 }
             }
         }
@@ -39,7 +51,7 @@ pipeline {
                     usernameVariable: 'ORG_GRADLE_PROJECT_astralrealmsUsername',
                     passwordVariable: 'ORG_GRADLE_PROJECT_astralrealmsPassword'
                 )]) {
-                    sh 'gradle publish'
+                    sh './gradlew --no-daemon --stacktrace publish'
                 }
             }
         }
