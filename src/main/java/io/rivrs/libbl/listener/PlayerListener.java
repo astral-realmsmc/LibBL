@@ -1,40 +1,36 @@
 package io.rivrs.libbl.listener;
 
-import io.rivrs.libbl.LibBL;
-import io.rivrs.libbl.model.entities.PacketEntity;
-import io.rivrs.libbl.service.EntityService;
-import io.rivrs.libbl.service.ViewerService;
+import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
+import io.rivrs.libbl.LibBL;
+import io.rivrs.libbl.model.entities.PacketEntity;
+import lombok.RequiredArgsConstructor;
+
+@RequiredArgsConstructor
 public class PlayerListener implements Listener {
 
-    private final EntityService service;
-    private final ViewerService viewerService;
-
-    public PlayerListener(LibBL plugin, EntityService service, ViewerService viewerService) {
-        this.viewerService = viewerService;
-        this.service = service;
-        plugin.getServer().getPluginManager().registerEvents(this, plugin);
-    }
+    private final LibBL plugin;
 
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
-        for (PacketEntity entity : this.service.entities()) {
+        Player player = event.getPlayer();
+        for (PacketEntity entity : this.plugin.entityService().entities()) {
             if (!entity.alive()
-                    || !entity.autoViewable())
+                || !entity.autoViewable())
                 continue;
-            entity.removeViewer(event.getPlayer());
+            entity.removeViewer(player);
         }
-        viewerService.unregisterPlayerChannel(event.getPlayer().getUniqueId());
+        this.plugin.viewerService().unregisterPlayerChannel(player.getUniqueId());
     }
 
     @EventHandler(priority = EventPriority.NORMAL)
     public void onPlayerJoin(PlayerJoinEvent event) {
-        viewerService.registerPlayer(event.getPlayer());
+        this.plugin.viewerService().registerPlayer(event.getPlayer());
     }
 
 }

@@ -1,10 +1,11 @@
 package io.rivrs.libbl.task;
 
-import io.rivrs.libbl.service.ViewerService;
-import lombok.RequiredArgsConstructor;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
+
+import io.rivrs.libbl.service.ViewerService;
+import lombok.RequiredArgsConstructor;
 
 @RequiredArgsConstructor
 public class ViewerUpdateTask extends BukkitRunnable {
@@ -17,6 +18,7 @@ public class ViewerUpdateTask extends BukkitRunnable {
             Player player = Bukkit.getPlayer(uuid);
             if (player == null || !player.isOnline()) {
                 this.service.unregisterPlayerChannel(uuid);
+                return;
             }
             if (channel == null) {
                 this.service.registerPlayer(uuid);
