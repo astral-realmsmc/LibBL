@@ -1,1 +1,27 @@
 entity-update-rate: 5 #Interval in ms
+
+visibility:
+  field-of-view:
+    # Only show entities the player can actually have on screen
+    enabled: true
+    # Aperture of the view cone, in degrees. The vanilla client sees roughly 110°,
+    # a slightly wider cone avoids entities popping in at the edge of the screen.
+    angle: 130.0
+    # Radius of the entity bounding sphere, an entity is visible as soon as this sphere enters the cone
+    entity-radius: 1.0
+    # Vertical offset of the entity center, relative to its location
+    entity-offset: 1.0
+    # How long, in ms, an entity stays spawned after leaving the view cone (avoids flickering when turning)
+    grace-period: 1000
+  line-of-sight:
+    # Also hide the entities occluded by blocks. Relies on the cached chunk snapshots,
+    # which cost memory, hence disabled by default.
+    enabled: false
+    # Maximum traced distance, in blocks
+    max-distance: 64.0
+
+chunk-cache:
+  # How often, in ticks, the outdated chunk snapshots are rebuilt. 0 disables the refresh.
+  refresh-interval: 20
+  # Maximum amount of chunks rebuilt per run, a mass edit is spread over several runs
+  refresh-limit: 32
