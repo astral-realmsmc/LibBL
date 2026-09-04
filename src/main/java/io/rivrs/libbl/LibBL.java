@@ -9,6 +9,9 @@ import org.bukkit.plugin.java.JavaPlugin;
 import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.event.PacketListenerPriority;
 
+import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
+
+import io.rivrs.libbl.command.SchematicCommand;
 import io.rivrs.libbl.listener.EntityInteractionListener;
 import io.rivrs.libbl.listener.MapListener;
 import io.rivrs.libbl.listener.PlayerListener;
@@ -110,6 +113,10 @@ public final class LibBL extends JavaPlugin {
         // Packet listeners
         PacketEvents.getAPI().getEventManager().registerListener(new EntityInteractionListener(this));
         PacketEvents.getAPI().getEventManager().registerListener(new MapListener(this), PacketListenerPriority.HIGHEST);
+
+        // Commands
+        this.getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, event -> event.registrar()
+                .register(new SchematicCommand(this).build(), "Paste a schematic as fake blocks, to try LibBL out in game"));
 
         instance = this;
 
