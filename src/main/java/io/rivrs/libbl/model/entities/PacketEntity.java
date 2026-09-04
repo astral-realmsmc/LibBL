@@ -455,8 +455,25 @@ public abstract class PacketEntity implements EntityMetadataProvider, ViewerHold
     }
 
     @Override
+    public void removeViewer(UUID uniqueId) {
+        Player viewer = Bukkit.getPlayer(uniqueId);
+        if (viewer != null) {
+            this.removeViewer(viewer);
+            return;
+        }
+
+        // The player is offline, there is nothing left to send
+        this.viewers.remove(uniqueId);
+    }
+
+    @Override
     public boolean isViewer(Player player) {
         return this.viewers.contains(player.getUniqueId());
+    }
+
+    @Override
+    public boolean isViewer(UUID uniqueId) {
+        return this.viewers.contains(uniqueId);
     }
 
     @Override

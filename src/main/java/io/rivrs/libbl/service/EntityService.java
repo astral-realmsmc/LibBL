@@ -25,7 +25,7 @@ public class EntityService {
     private ScheduledFuture<?> updateLoopFuture;
 
     public void init() {
-        this.visibilityTask = new EntityVisibilityTask(this);
+        this.visibilityTask = new EntityVisibilityTask(this.plugin, this);
         this.visibilityTask.runTaskTimerAsynchronously(this.plugin, 0, 5);
         updateLoopFuture = executor.scheduleAtFixedRate(() -> {
             try {

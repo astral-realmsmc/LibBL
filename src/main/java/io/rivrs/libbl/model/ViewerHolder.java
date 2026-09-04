@@ -13,7 +13,14 @@ public interface ViewerHolder {
 
     void removeViewer(Player viewer);
 
+    /**
+     * Removes a viewer from its unique id, works even when the player is offline.
+     */
+    void removeViewer(UUID uniqueId);
+
     boolean isViewer(Player player);
+
+    boolean isViewer(UUID uniqueId);
 
     @Unmodifiable
     Set<UUID> viewers();
