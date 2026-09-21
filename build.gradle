@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'io.rivrs'
-version = "1.0"
+version = "1.0-ffb-SNAPSHOT"
 
 repositories {
     mavenCentral()
