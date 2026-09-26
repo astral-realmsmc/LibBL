@@ -1,9 +1,11 @@
 package io.rivrs.libbl;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.bukkit.Chunk;
 import org.bukkit.World;
+import org.bukkit.event.Listener;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import com.github.retrooper.packetevents.PacketEvents;
@@ -49,6 +51,8 @@ public final class LibBL extends JavaPlugin {
     @Getter
     private static double LINE_OF_SIGHT_MAX_DISTANCE;
     @Getter
+    private static boolean CHUNK_CACHE_ENABLED;
+    @Getter
     private static int CHUNK_REFRESH_INTERVAL;
     @Getter
     private static int CHUNK_REFRESH_LIMIT;
@@ -80,10 +84,17 @@ public final class LibBL extends JavaPlugin {
         FIELD_OF_VIEW_ENTITY_RADIUS = this.getConfig().getDouble("visibility.field-of-view.entity-radius", 1.0D);
         FIELD_OF_VIEW_ENTITY_OFFSET = this.getConfig().getDouble("visibility.field-of-view.entity-offset", 1.0D);
         FIELD_OF_VIEW_GRACE_PERIOD = this.getConfig().getLong("visibility.field-of-view.grace-period", 1000L);
-        LINE_OF_SIGHT_ENABLED = this.getConfig().getBoolean("visibility.line-of-sight.enabled", false);
         LINE_OF_SIGHT_MAX_DISTANCE = this.getConfig().getDouble("visibility.line-of-sight.max-distance", 64.0D);
+        CHUNK_CACHE_ENABLED = this.getConfig().getBoolean("chunk-cache.enabled", false);
         CHUNK_REFRESH_INTERVAL = this.getConfig().getInt("chunk-cache.refresh-interval", 20);
         CHUNK_REFRESH_LIMIT = this.getConfig().getInt("chunk-cache.refresh-limit", 32);
+
+        // The line of sight is traced against the cached snapshots, it cannot work without them
+        LINE_OF_SIGHT_ENABLED = this.getConfig().getBoolean("visibility.line-of-sight.enabled", false);
+        if (LINE_OF_SIGHT_ENABLED && !CHUNK_CACHE_ENABLED) {
+            LINE_OF_SIGHT_ENABLED = false;
+            this.getSLF4JLogger().warn("visibility.line-of-sight.enabled requires chunk-cache.enabled, disabling it.");
+        }
 
         // Services
         this.entityService = new EntityService(this);
@@ -92,9 +103,11 @@ public final class LibBL extends JavaPlugin {
         this.worldService = new WorldService(this);
 
         // Cache the chunks that are already loaded, the listener only sees the next ones
-        for (World world : this.getServer().getWorlds()) {
-            for (Chunk chunk : world.getLoadedChunks()) {
-                this.worldService.registerChunk(chunk);
+        if (CHUNK_CACHE_ENABLED) {
+            for (World world : this.getServer().getWorlds()) {
+                for (Chunk chunk : world.getLoadedChunks()) {
+                    this.worldService.registerChunk(chunk);
+                }
             }
         }
 
@@ -105,10 +118,12 @@ public final class LibBL extends JavaPlugin {
 
 
         // Listeners
-        List.of(
-                new PlayerListener(this),
-                new WorldListener(this)
-        ).forEach(player -> this.getServer().getPluginManager().registerEvents(player, this));
+        List<Listener> listeners = new ArrayList<>();
+        listeners.add(new PlayerListener(this));
+        // The world listener only feeds the chunk cache, there is nothing to track when it is off
+        if (CHUNK_CACHE_ENABLED)
+            listeners.add(new WorldListener(this));
+        listeners.forEach(listener -> this.getServer().getPluginManager().registerEvents(listener, this));
 
         // Packet listeners
         PacketEvents.getAPI().getEventManager().registerListener(new EntityInteractionListener(this));

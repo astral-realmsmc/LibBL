@@ -21,6 +21,10 @@ visibility:
     max-distance: 64.0
 
 chunk-cache:
+  # Keeps a snapshot of every loaded chunk in memory, so the block states can be read from any thread.
+  # Only the line of sight check relies on it, disabling it drops the memory cost and the chunk listeners
+  # entirely. Leaving it off forces `visibility.line-of-sight.enabled` off as well.
+  enabled: false
   # How often, in ticks, the outdated chunk snapshots are rebuilt. 0 disables the refresh.
   refresh-interval: 20
   # Maximum amount of chunks rebuilt per run, a mass edit is spread over several runs

@@ -28,7 +28,8 @@ public class WorldService {
     private ChunkRefreshTask chunkRefreshTask;
 
     public void init() {
-        if (LibBL.CHUNK_REFRESH_INTERVAL() <= 0)
+        if (!LibBL.CHUNK_CACHE_ENABLED()
+            || LibBL.CHUNK_REFRESH_INTERVAL() <= 0)
             return;
 
         // Snapshots have to be rebuilt from the main thread
@@ -37,6 +38,9 @@ public class WorldService {
     }
 
     public void registerChunk(Chunk chunk) {
+        if (!LibBL.CHUNK_CACHE_ENABLED())
+            return;
+
         if (!Bukkit.isPrimaryThread())
             throw new IllegalStateException("WorldService.registerChunk must be called from the main thread.");
 
@@ -46,6 +50,9 @@ public class WorldService {
     }
 
     public void unregisterChunk(Chunk chunk) {
+        if (!LibBL.CHUNK_CACHE_ENABLED())
+            return;
+
         if (!Bukkit.isPrimaryThread())
             throw new IllegalStateException("WorldService.unregisterChunk must be called from the main thread.");
 
@@ -82,6 +89,9 @@ public class WorldService {
      * @return the number of rebuilt snapshots
      */
     public int refreshDirtyChunks(int limit) {
+        if (!LibBL.CHUNK_CACHE_ENABLED())
+            return 0;
+
         if (!Bukkit.isPrimaryThread())
             throw new IllegalStateException("WorldService.refreshDirtyChunks must be called from the main thread.");
 
@@ -125,8 +135,14 @@ public class WorldService {
     /**
      * Whether the chunk containing the given block position is cached, i.e. loaded.
      * Thread safe alternative to {@code Location#isChunkLoaded()}.
+     * <p>
+     * Always {@code true} when the chunk cache is disabled, the answer cannot be resolved off the
+     * main thread and a missing snapshot must never hide anything.
      */
     public boolean isChunkLoaded(Key worldKey, double x, double z) {
+        if (!LibBL.CHUNK_CACHE_ENABLED())
+            return true;
+
         WorldChunkCache cache = this.worlds.get(worldKey);
         return cache != null && cache.chunk(floor(x) >> 4, floor(z) >> 4) != null;
     }
@@ -154,7 +170,8 @@ public class WorldService {
      * (Amanatides &amp; Woo) and stopping on the first occluding block.
      * <p>
      * Positions whose chunk is not cached cannot be resolved and are considered visible, so that a
-     * missing snapshot never hides an entity.
+     * missing snapshot never hides an entity. The same goes for the whole check when the chunk cache
+     * is disabled.
      *
      * @param maxDistance maximum traced distance, {@code <= 0} to trace the whole segment
      * @return {@code true} when no occluding block stands between both positions
@@ -163,6 +180,9 @@ public class WorldService {
                                   double fromX, double fromY, double fromZ,
                                   double toX, double toY, double toZ,
                                   double maxDistance) {
+        if (!LibBL.CHUNK_CACHE_ENABLED())
+            return true;
+
         WorldChunkCache cache = this.worlds.get(worldKey);
         if (cache == null)
             return true;
