@@ -17,6 +17,7 @@ import io.rivrs.libbl.event.entity.PacketEntityAddViewerEvent;
 import io.rivrs.libbl.event.entity.PacketEntityDespawnEvent;
 import io.rivrs.libbl.event.entity.PacketEntityRemoveViewerEvent;
 import io.rivrs.libbl.event.entity.PacketEntitySpawnEvent;
+import io.rivrs.libbl.model.EntityAnimation;
 import io.rivrs.libbl.model.EquipmentType;
 import io.rivrs.libbl.model.ViewerHolder;
 import io.rivrs.libbl.model.flag.EntityFlags;
@@ -32,6 +33,7 @@ import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Pose;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.MainHand;
 import org.bukkit.util.Vector;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Unmodifiable;
@@ -404,6 +406,78 @@ public abstract class PacketEntity implements EntityMetadataProvider, ViewerHold
         ));
     }
 
+    // Animations
+
+    /**
+     * Plays a client side animation on the entity, for every viewer. Purely visual, nothing about the
+     * entity state changes.
+     * <p>
+     * The damage tilt has its own packet, see {@link #hurt(float)}.
+     */
+    public void animate(EntityAnimation animation) {
+        this.sendPacket(this.buildAnimationPacket(animation));
+    }
+
+    public void animate(Player player, EntityAnimation animation) {
+        this.sendPacket(player, this.buildAnimationPacket(animation));
+    }
+
+    /**
+     * Swings the arm holding the given hand, following the same convention as
+     * {@link io.rivrs.libbl.event.entity.PacketEntityInteractEvent}, where {@link MainHand#RIGHT} is the main hand.
+     */
+    public void swingHand(MainHand hand) {
+        this.animate(this.swingAnimation(hand));
+    }
+
+    public void swingHand(Player player, MainHand hand) {
+        this.animate(player, this.swingAnimation(hand));
+    }
+
+    /**
+     * Plays the damage tilt animation, as if the hit came from straight ahead.
+     */
+    public void hurt() {
+        this.hurt(0.0F);
+    }
+
+    /**
+     * Plays the damage tilt animation.
+     *
+     * @param yaw direction the hit came from, in degrees relative to the entity body
+     */
+    public void hurt(float yaw) {
+        this.sendPacket(this.buildHurtAnimationPacket(yaw));
+    }
+
+    public void hurt(Player player, float yaw) {
+        this.sendPacket(player, this.buildHurtAnimationPacket(yaw));
+    }
+
+    /**
+     * Plays the damage tilt animation, tilted towards the given position.
+     */
+    public void hurtFrom(Location source) {
+        this.hurt(this.hurtDirection(source));
+    }
+
+    public void hurtFrom(Player player, Location source) {
+        this.hurt(player, this.hurtDirection(source));
+    }
+
+    /**
+     * Direction a hit coming from the given position makes the entity tilt towards, in degrees
+     * relative to its body.
+     */
+    protected float hurtDirection(Location source) {
+        return (float) (Math.atan2(source.getZ() - this.location.getZ(), source.getX() - this.location.getX()) * 180.0D / Math.PI
+                        - this.location.getYaw());
+    }
+
+    private EntityAnimation swingAnimation(MainHand hand) {
+        return hand == MainHand.LEFT ? EntityAnimation.SWING_OFF_HAND : EntityAnimation.SWING_MAIN_HAND;
+    }
+
     // Metadata
     @Override
     public @NotNull List<EntityData<?>> entityData(@NotNull ClientVersion clientVersion) {
@@ -551,6 +625,14 @@ public abstract class PacketEntity implements EntityMetadataProvider, ViewerHold
                 this.location.getPitch(),
                 true
         );
+    }
+
+    protected WrapperPlayServerEntityAnimation buildAnimationPacket(EntityAnimation animation) {
+        return new WrapperPlayServerEntityAnimation(this.id, animation.type());
+    }
+
+    protected WrapperPlayServerHurtAnimation buildHurtAnimationPacket(float yaw) {
+        return new WrapperPlayServerHurtAnimation(this.id, yaw);
     }
 
     protected WrapperPlayServerEntityEquipment buildEquipmentPacket() {
