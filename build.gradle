@@ -8,6 +8,10 @@ group = 'io.rivrs'
 version = "1.0-ffb-SNAPSHOT"
 
 repositories {
+    // PolarisUtils, published with ./gradlew publishToMavenLocal
+    mavenLocal {
+        content { includeGroup 'com.polaris' }
+    }
     mavenCentral()
     maven {
         name = "papermc-repo"
@@ -20,6 +24,7 @@ repositories {
 dependencies {
     paperweight.paperDevBundle("26.1.2.build.72-stable")
     compileOnly("com.github.retrooper:packetevents-spigot:2.13.0")
+    compileOnly("com.polaris:PolarisUtils:1.0-SNAPSHOT")
 
     compileOnly 'org.projectlombok:lombok:1.+'
     annotationProcessor 'org.projectlombok:lombok:1.+'

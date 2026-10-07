@@ -3,13 +3,13 @@ package io.rivrs.libbl;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.bukkit.Chunk;
-import org.bukkit.World;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.event.PacketListenerPriority;
+import com.polaris.polarisUtils.api.PolarisUtilsAPI;
+import com.polaris.polarisUtils.api.utils.FieldOfView;
 
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 
@@ -17,12 +17,9 @@ import io.rivrs.libbl.command.SchematicCommand;
 import io.rivrs.libbl.listener.EntityInteractionListener;
 import io.rivrs.libbl.listener.MapListener;
 import io.rivrs.libbl.listener.PlayerListener;
-import io.rivrs.libbl.listener.WorldListener;
 import io.rivrs.libbl.service.BlockService;
 import io.rivrs.libbl.service.EntityService;
 import io.rivrs.libbl.service.ViewerService;
-import io.rivrs.libbl.service.WorldService;
-import io.rivrs.libbl.utils.FieldOfView;
 import lombok.Getter;
 
 @Getter
@@ -50,17 +47,10 @@ public final class LibBL extends JavaPlugin {
     private static boolean LINE_OF_SIGHT_ENABLED;
     @Getter
     private static double LINE_OF_SIGHT_MAX_DISTANCE;
-    @Getter
-    private static boolean CHUNK_CACHE_ENABLED;
-    @Getter
-    private static int CHUNK_REFRESH_INTERVAL;
-    @Getter
-    private static int CHUNK_REFRESH_LIMIT;
 
     private EntityService entityService;
     private BlockService blockService;
     private ViewerService viewerService;
-    private WorldService worldService;
 
     public static LibBL get() {
         return instance;
@@ -85,44 +75,27 @@ public final class LibBL extends JavaPlugin {
         FIELD_OF_VIEW_ENTITY_OFFSET = this.getConfig().getDouble("visibility.field-of-view.entity-offset", 1.0D);
         FIELD_OF_VIEW_GRACE_PERIOD = this.getConfig().getLong("visibility.field-of-view.grace-period", 1000L);
         LINE_OF_SIGHT_MAX_DISTANCE = this.getConfig().getDouble("visibility.line-of-sight.max-distance", 64.0D);
-        CHUNK_CACHE_ENABLED = this.getConfig().getBoolean("chunk-cache.enabled", false);
-        CHUNK_REFRESH_INTERVAL = this.getConfig().getInt("chunk-cache.refresh-interval", 20);
-        CHUNK_REFRESH_LIMIT = this.getConfig().getInt("chunk-cache.refresh-limit", 32);
 
-        // The line of sight is traced against the cached snapshots, it cannot work without them
+        // The line of sight is traced against the chunk cache of PolarisUtils, it cannot work without it
         LINE_OF_SIGHT_ENABLED = this.getConfig().getBoolean("visibility.line-of-sight.enabled", false);
-        if (LINE_OF_SIGHT_ENABLED && !CHUNK_CACHE_ENABLED) {
+        if (LINE_OF_SIGHT_ENABLED && !PolarisUtilsAPI.get().chunkCacheEnabled()) {
             LINE_OF_SIGHT_ENABLED = false;
-            this.getSLF4JLogger().warn("visibility.line-of-sight.enabled requires chunk-cache.enabled, disabling it.");
+            this.getSLF4JLogger().warn("visibility.line-of-sight.enabled requires chunk-cache.enabled in the PolarisUtils config, disabling it.");
         }
 
         // Services
         this.entityService = new EntityService(this);
         this.blockService = new BlockService(this);
         this.viewerService = new ViewerService(this);
-        this.worldService = new WorldService(this);
-
-        // Cache the chunks that are already loaded, the listener only sees the next ones
-        if (CHUNK_CACHE_ENABLED) {
-            for (World world : this.getServer().getWorlds()) {
-                for (Chunk chunk : world.getLoadedChunks()) {
-                    this.worldService.registerChunk(chunk);
-                }
-            }
-        }
 
         this.blockService.init();
         this.entityService.init();
         this.viewerService.init();
-        this.worldService.init();
 
 
         // Listeners
         List<Listener> listeners = new ArrayList<>();
         listeners.add(new PlayerListener(this));
-        // The world listener only feeds the chunk cache, there is nothing to track when it is off
-        if (CHUNK_CACHE_ENABLED)
-            listeners.add(new WorldListener(this));
         listeners.forEach(listener -> this.getServer().getPluginManager().registerEvents(listener, this));
 
         // Packet listeners
@@ -143,7 +116,6 @@ public final class LibBL extends JavaPlugin {
         this.entityService.shutdown();
         this.blockService.shutdown();
         this.viewerService.shutdown();
-        this.worldService.shutdown();
 
         instance = null;
     }
