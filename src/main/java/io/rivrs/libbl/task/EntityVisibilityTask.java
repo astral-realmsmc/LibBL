@@ -66,7 +66,7 @@ public class EntityVisibilityTask extends BukkitRunnable {
             Map<UUID, Long> lastSeen = this.lastInView.computeIfAbsent(entity.uniqueId(), _ -> new ConcurrentHashMap<>());
             for (UUID uuid : entity.viewers()) {
                 PlayerSnapshot snapshot = viewerService.snapshots().get(uuid);
-                if (snapshot != null && this.isVisible(worldService, snapshot, world, entity.location(), lastSeen, now))
+                if (snapshot != null && this.isVisible(worldService, snapshot, world, entity, lastSeen, now))
                     continue;
 
                 lastSeen.remove(uuid);
@@ -88,7 +88,7 @@ public class EntityVisibilityTask extends BukkitRunnable {
                     continue;
 
                 Map<UUID, Long> lastSeen = this.lastInView.computeIfAbsent(entity.uniqueId(), _ -> new ConcurrentHashMap<>());
-                if (!this.isVisible(worldService, snapshot, world, entity.location(), lastSeen, now))
+                if (!this.isVisible(worldService, snapshot, world, entity, lastSeen, now))
                     continue;
 
                 if (viewer == null)
@@ -124,12 +124,13 @@ public class EntityVisibilityTask extends BukkitRunnable {
     private boolean isVisible(WorldService worldService,
                               PlayerSnapshot snapshot,
                               Key world,
-                              Location location,
+                              PacketEntity entity,
                               Map<UUID, Long> lastSeen,
                               long now) {
         if (!snapshot.isInWorld(world))
             return false;
 
+        Location location = entity.location();
         double x = location.getX();
         double y = location.getY();
         double z = location.getZ();
@@ -137,7 +138,7 @@ public class EntityVisibilityTask extends BukkitRunnable {
         if (snapshot.distanceSquared(x, y, z) >= LibBL.ENTITY_SIMULATION_DISTANCE_SQR())
             return false;
 
-        if (!LibBL.FIELD_OF_VIEW_ENABLED())
+        if (!LibBL.FIELD_OF_VIEW_ENABLED() || !entity.fieldOfViewCulled())
             return true;
 
         double centerY = y + LibBL.FIELD_OF_VIEW_ENTITY_OFFSET();

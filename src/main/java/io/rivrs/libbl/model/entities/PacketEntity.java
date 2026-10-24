@@ -76,6 +76,11 @@ public abstract class PacketEntity implements EntityMetadataProvider, ViewerHold
     protected boolean autoViewable = true;
     // State
     protected boolean alive;
+    /**
+     * Whether the visibility task may hide the entity from a player who turned away from it (field
+     * of view, line of sight); distance always applies.
+     */
+    protected boolean fieldOfViewCulled = true;
 
     // batch(): how deep, and whether a setter asked for the metadata meanwhile
     @Getter(AccessLevel.NONE)
@@ -208,6 +213,14 @@ public abstract class PacketEntity implements EntityMetadataProvider, ViewerHold
         }
 
         this.alive = false;
+    }
+
+    /**
+     * Lets the visibility task hide the entity from players looking away from it, or not: an entity
+     * a player works on should stay drawn behind them.
+     */
+    public void fieldOfViewCulled(boolean culled) {
+        this.fieldOfViewCulled = culled;
     }
 
     /**
