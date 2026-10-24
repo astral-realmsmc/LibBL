@@ -10,6 +10,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.jetbrains.annotations.Nullable;
 
 import io.rivrs.libbl.LibBL;
 import io.rivrs.libbl.model.entities.PacketEntity;
@@ -23,6 +24,10 @@ import net.kyori.adventure.key.Key;
 
 /**
  * Asynchronously computes, for every auto viewable entity, which players should see it.
+ * <p>
+ * Removing viewers walks each entity's own viewers; adding them only looks, for each player, at the
+ * entities of the chunks within simulation distance ({@link EntityService#near}), so the cost grows
+ * with what is around players rather than with every entity times every player.
  * <p>
  * The whole check runs off the main thread: player positions come from {@link PlayerSnapshot}s and
  * blocks from the chunk snapshots held by the {@link WorldService}, no Bukkit world state is touched.
@@ -47,47 +52,73 @@ public class EntityVisibilityTask extends BukkitRunnable {
         long now = System.currentTimeMillis();
         Set<UUID> processed = new HashSet<>();
 
+        // Remove the viewers that went offline, changed world or moved away: only an entity's own
+        // viewers are looked at.
         for (PacketEntity entity : this.service.entities()) {
-            if (!entity.alive()
-                || !entity.autoViewable())
-                continue;
-
-            Location location = entity.location();
-            if (location == null
-                || !location.isWorldLoaded())
-                continue;
-
-            Key world = location.getWorld().key();
-            if (!worldService.isChunkLoaded(world, location.getX(), location.getZ()))
+            Key world = this.trackedWorld(worldService, entity);
+            if (world == null)
                 continue;
 
             processed.add(entity.uniqueId());
-            Map<UUID, Long> lastSeen = this.lastInView.computeIfAbsent(entity.uniqueId(), _ -> new ConcurrentHashMap<>());
+            if (entity.viewers().isEmpty())
+                continue;
 
-            // Remove the viewers that went offline, changed world or moved away
+            Map<UUID, Long> lastSeen = this.lastInView.computeIfAbsent(entity.uniqueId(), _ -> new ConcurrentHashMap<>());
             for (UUID uuid : entity.viewers()) {
                 PlayerSnapshot snapshot = viewerService.snapshots().get(uuid);
-                if (snapshot != null && this.isVisible(worldService, snapshot, world, location, lastSeen, now))
+                if (snapshot != null && this.isVisible(worldService, snapshot, world, entity.location(), lastSeen, now))
                     continue;
 
                 lastSeen.remove(uuid);
                 entity.removeViewer(uuid);
             }
+        }
 
-            // Add the players that can now see the entity
-            for (PlayerSnapshot snapshot : viewerService.playerSnapshots()) {
-                if (entity.isViewer(snapshot.uniqueId())
-                    || !this.isVisible(worldService, snapshot, world, location, lastSeen, now))
+        // Add the players that can now see an entity: only the entities of the chunks within
+        // simulation distance of each player are looked at.
+        int radius = (int) Math.ceil(Math.sqrt(LibBL.ENTITY_SIMULATION_DISTANCE_SQR()) / 16);
+        for (PlayerSnapshot snapshot : viewerService.playerSnapshots()) {
+            Player viewer = null;
+            for (PacketEntity entity : this.service.near(snapshot.world(), (int) Math.floor(snapshot.x()) >> 4, (int) Math.floor(snapshot.z()) >> 4, radius)) {
+                if (entity.isViewer(snapshot.uniqueId()))
                     continue;
 
-                Player viewer = Bukkit.getPlayer(snapshot.uniqueId());
-                if (viewer != null)
-                    entity.addViewer(viewer);
+                Key world = this.trackedWorld(worldService, entity);
+                if (world == null)
+                    continue;
+
+                Map<UUID, Long> lastSeen = this.lastInView.computeIfAbsent(entity.uniqueId(), _ -> new ConcurrentHashMap<>());
+                if (!this.isVisible(worldService, snapshot, world, entity.location(), lastSeen, now))
+                    continue;
+
+                if (viewer == null)
+                    viewer = Bukkit.getPlayer(snapshot.uniqueId());
+                if (viewer == null)
+                    break;
+                entity.addViewer(viewer);
             }
         }
 
         // Drop the tracking data of the entities that are gone
         this.lastInView.keySet().retainAll(processed);
+    }
+
+    /**
+     * The world of an entity the task manages (alive, auto viewable, in a loaded chunk), or
+     * {@code null} for one it leaves alone.
+     */
+    private @Nullable Key trackedWorld(WorldService worldService, PacketEntity entity) {
+        if (!entity.alive()
+            || !entity.autoViewable())
+            return null;
+
+        Location location = entity.location();
+        if (location == null
+            || !location.isWorldLoaded())
+            return null;
+
+        Key world = location.getWorld().key();
+        return worldService.isChunkLoaded(world, location.getX(), location.getZ()) ? world : null;
     }
 
     private boolean isVisible(WorldService worldService,

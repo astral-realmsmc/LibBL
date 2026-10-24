@@ -158,6 +158,7 @@ public abstract class PacketEntity implements EntityMetadataProvider, ViewerHold
     public void teleport(Location location) {
         this.sendPacket(this.buildTeleportPacket(location));
         this.location = location.clone();
+        LibBL.get().entityService().moved(this);
     }
 
     public void teleport(Player player, Location location) {
@@ -171,6 +172,7 @@ public abstract class PacketEntity implements EntityMetadataProvider, ViewerHold
                 onGround
         ));
         this.location = location.clone();
+        LibBL.get().entityService().moved(this);
     }
 
     public void teleport(Player player, Location location, Location lastLocation) {
