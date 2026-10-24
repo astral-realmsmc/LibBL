@@ -7,6 +7,7 @@ import com.github.retrooper.packetevents.util.Vector3f;
 import io.rivrs.libbl.model.entities.entity.PacketLivingEntity;
 import io.rivrs.libbl.model.flag.ArmorStandFlags;
 import io.rivrs.libbl.model.flag.Flag;
+import lombok.Getter;
 import org.bukkit.Location;
 import org.bukkit.entity.EntityType;
 import org.jetbrains.annotations.NotNull;
@@ -14,6 +15,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.List;
 import java.util.UUID;
 
+@Getter
 public class PacketArmorStand extends PacketLivingEntity {
 
     private Vector3f headRotation = new Vector3f(0, 0, 0);
