@@ -208,6 +208,17 @@ public abstract class PacketEntity implements EntityMetadataProvider, ViewerHold
         this.alive = false;
     }
 
+    /**
+     * Gets rid of the entity for good: destroyed for its viewers, its viewers forgotten, and out of
+     * the {@link io.rivrs.libbl.service.EntityService}. {@link #despawn()} alone keeps it registered
+     * and remembers its viewers, for a later {@link #spawn()}.
+     */
+    public void remove() {
+        this.despawn();
+        this.viewers.clear();
+        this.unregister();
+    }
+
     protected LinkedList<PacketWrapper<?>> buildDestroyPackets() {
         LinkedList<PacketWrapper<?>> packets = new LinkedList<>();
 
