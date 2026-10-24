@@ -7,6 +7,7 @@ import com.github.retrooper.packetevents.util.Vector3f;
 import io.rivrs.libbl.model.entities.entity.PacketLivingEntity;
 import io.rivrs.libbl.model.flag.ArmorStandFlags;
 import io.rivrs.libbl.model.flag.Flag;
+import lombok.Getter;
 import org.bukkit.Location;
 import org.bukkit.entity.EntityType;
 import org.jetbrains.annotations.NotNull;
@@ -14,6 +15,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.List;
 import java.util.UUID;
 
+@Getter
 public class PacketArmorStand extends PacketLivingEntity {
 
     private Vector3f headRotation = new Vector3f(0, 0, 0);
@@ -39,37 +41,37 @@ public class PacketArmorStand extends PacketLivingEntity {
     public void headRotation(Vector3f rotation) {
         this.headRotation = rotation;
 
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void bodyRotation(Vector3f rotation) {
         this.bodyRotation = rotation;
 
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void leftArmRotation(Vector3f rotation) {
         this.leftArmRotation = rotation;
 
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void rightArmRotation(Vector3f rotation) {
         this.rightArmRotation = rotation;
 
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void leftLegRotation(Vector3f rotation) {
         this.leftLegRotation = rotation;
 
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void rightLegRotation(Vector3f rotation) {
         this.rightLegRotation = rotation;
 
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     @Override

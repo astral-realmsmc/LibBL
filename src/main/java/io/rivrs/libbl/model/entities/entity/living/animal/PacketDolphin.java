@@ -32,13 +32,13 @@ public class PacketDolphin extends PacketAnimal {
     public void setHasFish(boolean hasFish) {
         this.hasFish = hasFish;
 
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void setMoistureLevel(int moistureLevel) {
         this.moistureLevel = moistureLevel;
 
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     @Override

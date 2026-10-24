@@ -23,6 +23,7 @@ import io.rivrs.libbl.model.ViewerHolder;
 import io.rivrs.libbl.model.flag.EntityFlags;
 import io.rivrs.libbl.model.flag.Flag;
 import io.rivrs.libbl.utils.ParticleUtils;
+import lombok.AccessLevel;
 import lombok.Getter;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
@@ -77,6 +78,17 @@ public abstract class PacketEntity implements EntityMetadataProvider, ViewerHold
     protected boolean autoViewable = true;
     // State
     protected boolean alive;
+    /**
+     * Whether the visibility task may hide the entity from a player who turned away from it (field
+     * of view, line of sight); distance always applies.
+     */
+    protected boolean fieldOfViewCulled = true;
+
+    // batch(): how deep, and whether a setter asked for the metadata meanwhile
+    @Getter(AccessLevel.NONE)
+    private int batchDepth;
+    @Getter(AccessLevel.NONE)
+    private boolean metadataPending;
     // PacketEntityConsumer
     protected Map<Long,Set<Consumer<PacketEntity>>> consumers = new ConcurrentHashMap<>();
 
@@ -153,6 +165,7 @@ public abstract class PacketEntity implements EntityMetadataProvider, ViewerHold
     public void teleport(Location location) {
         this.sendPacket(this.buildTeleportPacket(location));
         this.location = location.clone();
+        LibBL.get().entityService().moved(this);
     }
 
     public void teleport(Player player, Location location) {
@@ -166,6 +179,7 @@ public abstract class PacketEntity implements EntityMetadataProvider, ViewerHold
                 onGround
         ));
         this.location = location.clone();
+        LibBL.get().entityService().moved(this);
     }
 
     public void teleport(Player player, Location location, Location lastLocation) {
@@ -201,6 +215,25 @@ public abstract class PacketEntity implements EntityMetadataProvider, ViewerHold
         }
 
         this.alive = false;
+    }
+
+    /**
+     * Lets the visibility task hide the entity from players looking away from it, or not: an entity
+     * a player works on should stay drawn behind them.
+     */
+    public void fieldOfViewCulled(boolean culled) {
+        this.fieldOfViewCulled = culled;
+    }
+
+    /**
+     * Gets rid of the entity for good: destroyed for its viewers, its viewers forgotten, and out of
+     * the {@link io.rivrs.libbl.service.EntityService}. {@link #despawn()} alone keeps it registered
+     * and remembers its viewers, for a later {@link #spawn()}.
+     */
+    public void remove() {
+        this.despawn();
+        this.viewers.clear();
+        this.unregister();
     }
 
     protected LinkedList<PacketWrapper<?>> buildDestroyPackets() {
@@ -677,8 +710,32 @@ public abstract class PacketEntity implements EntityMetadataProvider, ViewerHold
     }
 
 
+    /**
+     * Sends the metadata to every viewer, or, inside {@link #batch(Runnable)}, once the batch ends.
+     */
     public void updateMetadata() {
+        if (this.batchDepth > 0) {
+            this.metadataPending = true;
+            return;
+        }
         this.sendPacket(this.buildMetadataPacket());
+    }
+
+    /**
+     * Runs {@code changes} holding back the metadata every setter sends, then sends it once if any
+     * of them changed it: setting ten values costs one packet instead of ten. Batches nest, the
+     * outermost one sends. Meant for one thread at a time, like the setters themselves.
+     */
+    public void batch(Runnable changes) {
+        this.batchDepth++;
+        try {
+            changes.run();
+        } finally {
+            if (--this.batchDepth == 0 && this.metadataPending) {
+                this.metadataPending = false;
+                this.updateMetadata();
+            }
+        }
     }
 
     public void updateMetadata(Player player) {

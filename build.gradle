@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'io.rivrs'
-version = "1.0-ffb-SNAPSHOT"
+version = "1.1"
 
 repositories {
     // PolarisUtils, published with ./gradlew publishToMavenLocal
@@ -23,7 +23,7 @@ repositories {
 
 dependencies {
     paperweight.paperDevBundle("26.1.2.build.72-stable")
-    compileOnly("com.github.retrooper:packetevents-spigot:2.13.0")
+    compileOnly("com.github.retrooper:packetevents-spigot:2.14.0")
     compileOnly("com.polaris:PolarisUtils:1.0-SNAPSHOT")
 
     compileOnly 'org.projectlombok:lombok:1.+'

@@ -33,17 +33,17 @@ public abstract class PacketLivingEntity extends PacketEntity {
 
     public void health(float health) {
         this.health = health;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void arrowsInBody(int arrowsInBody) {
         this.arrowsInBody = arrowsInBody;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void beeStingerCount(int beeStingerCount) {
         this.beeStingerCount = beeStingerCount;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     @Override

@@ -36,7 +36,7 @@ public abstract class PacketThrownItemProjectile extends PacketEntity {
 
     public void item(ItemStack item) {
         this.item = item;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     @Override

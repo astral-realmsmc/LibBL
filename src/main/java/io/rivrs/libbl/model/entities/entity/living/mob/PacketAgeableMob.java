@@ -34,12 +34,12 @@ public abstract class PacketAgeableMob extends PacketMob {
 
     public void baby(boolean baby) {
         this.isBaby = baby;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void ageLocked(boolean ageLocked) {
         this.ageLocked = ageLocked;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
 

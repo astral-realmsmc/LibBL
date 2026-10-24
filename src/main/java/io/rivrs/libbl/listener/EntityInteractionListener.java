@@ -13,10 +13,21 @@ import lombok.RequiredArgsConstructor;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.MainHand;
 
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
 @RequiredArgsConstructor
 public class EntityInteractionListener extends SimplePacketListenerAbstract {
 
+    /**
+     * A plain interact this soon after an interact-at on the same entity with the same hand is the
+     * same click, which the client sends twice.
+     */
+    private static final long SAME_CLICK = 100;
+
     private final LibBL plugin;
+    private final Map<UUID, InteractAt> lastInteractAt = new ConcurrentHashMap<>();
 
     @Override
     public void onPacketPlayReceive(PacketPlayReceiveEvent event) {
@@ -37,18 +48,34 @@ public class EntityInteractionListener extends SimplePacketListenerAbstract {
                     }
 
                     MainHand hand = packet.getHand().equals(InteractionHand.MAIN_HAND) ? MainHand.RIGHT : MainHand.LEFT;
+                    boolean sneaking = packet.isSneaking().orElse(false);
 
-                    if (packet.getAction().equals(WrapperPlayClientInteractEntity.InteractAction.ATTACK)) {
-                        new PacketEntityAttackEvent(packetEntity, player, packet.isSneaking().orElse(false), hand).callEvent();
-                        return;
+                    switch (packet.getAction()) {
+                        case ATTACK -> new PacketEntityAttackEvent(packetEntity, player, sneaking, hand).callEvent();
+                        case INTERACT_AT -> {
+                            this.lastInteractAt.put(player.getUniqueId(), new InteractAt(packet.getEntityId(), packet.getHand(), System.currentTimeMillis()));
+                            new PacketEntityInteractEvent(packetEntity, player, sneaking, hand, PacketEntityInteractEvent.Action.INTERACT_AT,
+                                    packet.getTarget().orElse(null)).callEvent();
+                        }
+                        case INTERACT -> {
+                            InteractAt last = this.lastInteractAt.remove(player.getUniqueId());
+                            if (last != null && last.isSameClick(packet.getEntityId(), packet.getHand()))
+                                return;
+                            new PacketEntityInteractEvent(packetEntity, player, sneaking, hand, PacketEntityInteractEvent.Action.INTERACT, null).callEvent();
+                        }
                     }
-
-                    new PacketEntityInteractEvent(packetEntity, player, packet.isSneaking().orElse(false), hand).callEvent();
                 });
     }
 
     @Override
     public PacketListenerPriority getPriority() {
         return PacketListenerPriority.MONITOR;
+    }
+
+    private record InteractAt(int entityId, InteractionHand hand, long at) {
+
+        boolean isSameClick(int entityId, InteractionHand hand) {
+            return this.entityId == entityId && this.hand == hand && System.currentTimeMillis() - this.at <= SAME_CLICK;
+        }
     }
 }

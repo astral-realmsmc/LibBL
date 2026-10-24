@@ -30,7 +30,7 @@ public class PacketWitherSkull extends PacketEntity {
 
     public void charged(boolean charged) {
         this.charged = charged;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     @Override

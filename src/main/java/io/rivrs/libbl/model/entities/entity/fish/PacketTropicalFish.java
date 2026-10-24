@@ -31,7 +31,7 @@ public class PacketTropicalFish extends PacketAbstractFish {
 
     public void variant(int variant) {
         this.variant = variant;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     @Override

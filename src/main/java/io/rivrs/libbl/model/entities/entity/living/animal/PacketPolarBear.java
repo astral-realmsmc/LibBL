@@ -31,7 +31,7 @@ public class PacketPolarBear extends PacketAnimal {
     public void standingUp(boolean standingUp) {
         this.standingUp = standingUp;
 
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     @Override

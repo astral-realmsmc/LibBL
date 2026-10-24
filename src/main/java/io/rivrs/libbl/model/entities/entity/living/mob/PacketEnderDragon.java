@@ -32,7 +32,7 @@ public class PacketEnderDragon extends PacketMob {
 
     public void phase(EnderDragon.Phase phase) {
         this.phase = phase;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     @Override

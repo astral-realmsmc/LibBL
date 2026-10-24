@@ -34,17 +34,17 @@ public class PacketShulker extends PacketMob {
 
     public void shieldHeight(byte shieldHeight) {
         this.shieldHeight = shieldHeight;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void color(byte color) {
         this.color = color;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void direction(Direction direction) {
         this.direction = direction;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     @Override

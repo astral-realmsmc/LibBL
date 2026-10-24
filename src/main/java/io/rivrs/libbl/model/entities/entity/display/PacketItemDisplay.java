@@ -39,12 +39,12 @@ public class PacketItemDisplay extends PacketDisplay {
     public void displayTransform(ItemDisplay.ItemDisplayTransform displayTransform) {
         this.displayTransform = displayTransform;
 
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void itemstack(ItemStack itemStack) {
         this.itemStack = itemStack;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     @Override

@@ -38,13 +38,13 @@ public class PacketFishingBobber extends PacketEntity {
     public void catchable(boolean catchable) {
         this.catchable = catchable;
 
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void hookedId(int id) {
         this.hookedId = id;
 
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     @Override

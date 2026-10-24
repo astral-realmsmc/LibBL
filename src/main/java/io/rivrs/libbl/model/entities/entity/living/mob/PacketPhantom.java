@@ -31,7 +31,7 @@ public class PacketPhantom extends PacketMob {
 
     public void size(int size) {
         this.size = size;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     @Override

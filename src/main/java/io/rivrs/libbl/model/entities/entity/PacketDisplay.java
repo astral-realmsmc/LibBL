@@ -50,37 +50,37 @@ public abstract class PacketDisplay extends PacketEntity {
 
     public void interpolationDuration(int interpolationDuration) {
         this.interpolationDuration = interpolationDuration;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void interpolationDelay(int interpolationDelay) {
         this.interpolationDelay = interpolationDelay;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void positionRotationInterpolationDelay(int positionRotationInterpolationDelay) {
         this.positionRotationInterpolationDelay = positionRotationInterpolationDelay;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void translation(Vector3f translation) {
         this.translation = translation;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void scale(Vector3f scale) {
         this.scale = scale;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void rotationLeft(Quaternion4f rotationLeft) {
         this.rotationLeft = rotationLeft;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void rotationRight(Quaternion4f rotationRight) {
         this.rotationRight = rotationRight;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void transformation(Transformation transformation) {
@@ -89,47 +89,47 @@ public abstract class PacketDisplay extends PacketEntity {
         this.rotationRight = new Quaternion4f(transformation.getRightRotation().x(), transformation.getRightRotation().y(), transformation.getRightRotation().z(), transformation.getRightRotation().w());
         this.scale = new Vector3f(transformation.getScale().x(), transformation.getScale().y(), transformation.getScale().z());
 
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void billboard(Display.Billboard billboard) {
         this.billboard = billboard;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void brightness(int brightness) {
         this.brightness = brightness;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void viewRange(float viewRange) {
         this.viewRange = viewRange;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void shadowRadius(float shadowRadius) {
         this.shadowRadius = shadowRadius;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void shadowStrength(float shadowStrength) {
         this.shadowStrength = shadowStrength;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void width(float width) {
         this.width = width;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void height(float height) {
         this.height = height;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void glowColor(Color glowColor) {
         this.glowColor = glowColor;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     @Override

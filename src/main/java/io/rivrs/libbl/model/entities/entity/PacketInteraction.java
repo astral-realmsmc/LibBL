@@ -4,6 +4,7 @@ import com.github.retrooper.packetevents.protocol.entity.data.EntityData;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes;
 import com.github.retrooper.packetevents.protocol.player.ClientVersion;
 import io.rivrs.libbl.model.entities.PacketEntity;
+import lombok.Getter;
 import org.bukkit.Location;
 import org.bukkit.entity.EntityType;
 import org.jetbrains.annotations.NotNull;
@@ -11,6 +12,7 @@ import org.jetbrains.annotations.NotNull;
 import java.util.List;
 import java.util.UUID;
 
+@Getter
 public class PacketInteraction extends PacketEntity {
 
     private float width = 1.f;
@@ -26,7 +28,7 @@ public class PacketInteraction extends PacketEntity {
         this.width = width;
         this.height = height;
         this.responsive = responsive;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public PacketInteraction(UUID uniqueId, Location location) {
@@ -39,17 +41,17 @@ public class PacketInteraction extends PacketEntity {
 
     public void width(float width) {
         this.width = width;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void height(float height) {
         this.height = height;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void responsive(boolean responsive) {
         this.responsive = responsive;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     @Override
