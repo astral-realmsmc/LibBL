@@ -6,3 +6,8 @@ load: STARTUP
 authors: [ Reytz, LordKiwix ]
 depend:
   - packetevents
+  - PolarisUtils
+permissions:
+  libbl.schematic:
+    description: Paste a schematic as fake blocks with /fakeschem
+    default: op

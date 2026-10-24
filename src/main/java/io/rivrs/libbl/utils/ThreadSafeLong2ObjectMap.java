@@ -28,12 +28,12 @@ public class ThreadSafeLong2ObjectMap<V> {
         return locks[hash & (locks.length - 1)];
     }
 
-    /** Thread-safe put */
-    public void put(long key, V value) {
+    /** Thread-safe put, returning the value it replaced or null */
+    public V put(long key, V value) {
         ReentrantLock lock = lockFor(key);
         lock.lock();
         try {
-            map.put(key, value);
+            return map.put(key, value);
         } finally {
             lock.unlock();
         }

@@ -11,13 +11,13 @@ import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import com.polaris.polarisUtils.api.PolarisUtilsAPI;
+import com.polaris.polarisUtils.api.model.PlayerSnapshot;
+import com.polaris.polarisUtils.api.utils.FieldOfView;
+
 import io.rivrs.libbl.LibBL;
 import io.rivrs.libbl.model.entities.PacketEntity;
-import io.rivrs.libbl.model.player.PlayerSnapshot;
 import io.rivrs.libbl.service.EntityService;
-import io.rivrs.libbl.service.ViewerService;
-import io.rivrs.libbl.service.WorldService;
-import io.rivrs.libbl.utils.FieldOfView;
 import lombok.RequiredArgsConstructor;
 import net.kyori.adventure.key.Key;
 
@@ -25,7 +25,7 @@ import net.kyori.adventure.key.Key;
  * Asynchronously computes, for every auto viewable entity, which players should see it.
  * <p>
  * The whole check runs off the main thread: player positions come from {@link PlayerSnapshot}s and
- * blocks from the chunk snapshots held by the {@link WorldService}, no Bukkit world state is touched.
+ * blocks from the chunk cache of PolarisUtils, no Bukkit world state is touched.
  */
 @RequiredArgsConstructor
 public class EntityVisibilityTask extends BukkitRunnable {
@@ -41,8 +41,7 @@ public class EntityVisibilityTask extends BukkitRunnable {
 
     @Override
     public void run() {
-        ViewerService viewerService = this.plugin.viewerService();
-        WorldService worldService = this.plugin.worldService();
+        PolarisUtilsAPI api = PolarisUtilsAPI.get();
 
         long now = System.currentTimeMillis();
         Set<UUID> processed = new HashSet<>();
@@ -58,7 +57,7 @@ public class EntityVisibilityTask extends BukkitRunnable {
                 continue;
 
             Key world = location.getWorld().key();
-            if (!worldService.isChunkLoaded(world, location.getX(), location.getZ()))
+            if (!api.isChunkLoaded(world, location.getX(), location.getZ()))
                 continue;
 
             processed.add(entity.uniqueId());
@@ -66,8 +65,8 @@ public class EntityVisibilityTask extends BukkitRunnable {
 
             // Remove the viewers that went offline, changed world or moved away
             for (UUID uuid : entity.viewers()) {
-                PlayerSnapshot snapshot = viewerService.snapshots().get(uuid);
-                if (snapshot != null && this.isVisible(worldService, snapshot, world, location, lastSeen, now))
+                PlayerSnapshot snapshot = api.snapshot(uuid).orElse(null);
+                if (snapshot != null && this.isVisible(api, snapshot, world, location, lastSeen, now))
                     continue;
 
                 lastSeen.remove(uuid);
@@ -75,9 +74,9 @@ public class EntityVisibilityTask extends BukkitRunnable {
             }
 
             // Add the players that can now see the entity
-            for (PlayerSnapshot snapshot : viewerService.playerSnapshots()) {
+            for (PlayerSnapshot snapshot : api.snapshots()) {
                 if (entity.isViewer(snapshot.uniqueId())
-                    || !this.isVisible(worldService, snapshot, world, location, lastSeen, now))
+                    || !this.isVisible(api, snapshot, world, location, lastSeen, now))
                     continue;
 
                 Player viewer = Bukkit.getPlayer(snapshot.uniqueId());
@@ -90,7 +89,7 @@ public class EntityVisibilityTask extends BukkitRunnable {
         this.lastInView.keySet().retainAll(processed);
     }
 
-    private boolean isVisible(WorldService worldService,
+    private boolean isVisible(PolarisUtilsAPI api,
                               PlayerSnapshot snapshot,
                               Key world,
                               Location location,
@@ -112,7 +111,7 @@ public class EntityVisibilityTask extends BukkitRunnable {
         double centerY = y + LibBL.FIELD_OF_VIEW_ENTITY_OFFSET();
         boolean inView = FieldOfView.isInFieldOfView(snapshot, x, centerY, z, LibBL.FIELD_OF_VIEW_COS_HALF_ANGLE(), LibBL.FIELD_OF_VIEW_ENTITY_RADIUS())
                          && (!LibBL.LINE_OF_SIGHT_ENABLED()
-                             || worldService.hasLineOfSight(world, snapshot.x(), snapshot.eyeY(), snapshot.z(), x, centerY, z, LibBL.LINE_OF_SIGHT_MAX_DISTANCE()));
+                             || api.hasLineOfSight(world, snapshot.x(), snapshot.eyeY(), snapshot.z(), x, centerY, z, LibBL.LINE_OF_SIGHT_MAX_DISTANCE()));
 
         if (inView) {
             lastSeen.put(snapshot.uniqueId(), now);
