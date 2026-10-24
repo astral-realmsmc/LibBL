@@ -38,22 +38,22 @@ public class PacketTextDisplay extends PacketDisplay {
 
     public void text(Component text) {
         this.text = text;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void lineWidth(int lineWidth) {
         this.lineWidth = lineWidth;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void backgroundColor(Color backgroundColor) {
         this.backgroundColor = backgroundColor;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void opacity(byte opacity) {
         this.opacity = opacity;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     @Override

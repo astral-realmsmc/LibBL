@@ -35,12 +35,12 @@ public class PacketTrident extends PacketAbstractArrow {
             throw new IllegalArgumentException("Loyalty level must be between 0 and 127");
 
         this.loyaltyLevel = loyaltyLevel;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void enchanted(boolean enchanted) {
         this.enchanted = enchanted;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     @Override

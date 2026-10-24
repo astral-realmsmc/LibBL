@@ -28,7 +28,7 @@ public class PacketInteraction extends PacketEntity {
         this.width = width;
         this.height = height;
         this.responsive = responsive;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public PacketInteraction(UUID uniqueId, Location location) {
@@ -41,17 +41,17 @@ public class PacketInteraction extends PacketEntity {
 
     public void width(float width) {
         this.width = width;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void height(float height) {
         this.height = height;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void responsive(boolean responsive) {
         this.responsive = responsive;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     @Override

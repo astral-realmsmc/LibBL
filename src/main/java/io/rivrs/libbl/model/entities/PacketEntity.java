@@ -22,6 +22,7 @@ import io.rivrs.libbl.model.ViewerHolder;
 import io.rivrs.libbl.model.flag.EntityFlags;
 import io.rivrs.libbl.model.flag.Flag;
 import io.rivrs.libbl.utils.ParticleUtils;
+import lombok.AccessLevel;
 import lombok.Getter;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
@@ -75,6 +76,12 @@ public abstract class PacketEntity implements EntityMetadataProvider, ViewerHold
     protected boolean autoViewable = true;
     // State
     protected boolean alive;
+
+    // batch(): how deep, and whether a setter asked for the metadata meanwhile
+    @Getter(AccessLevel.NONE)
+    private int batchDepth;
+    @Getter(AccessLevel.NONE)
+    private boolean metadataPending;
     // PacketEntityConsumer
     protected Map<Long,Set<Consumer<PacketEntity>>> consumers = new ConcurrentHashMap<>();
 
@@ -595,8 +602,32 @@ public abstract class PacketEntity implements EntityMetadataProvider, ViewerHold
     }
 
 
+    /**
+     * Sends the metadata to every viewer, or, inside {@link #batch(Runnable)}, once the batch ends.
+     */
     public void updateMetadata() {
+        if (this.batchDepth > 0) {
+            this.metadataPending = true;
+            return;
+        }
         this.sendPacket(this.buildMetadataPacket());
+    }
+
+    /**
+     * Runs {@code changes} holding back the metadata every setter sends, then sends it once if any
+     * of them changed it: setting ten values costs one packet instead of ten. Batches nest, the
+     * outermost one sends. Meant for one thread at a time, like the setters themselves.
+     */
+    public void batch(Runnable changes) {
+        this.batchDepth++;
+        try {
+            changes.run();
+        } finally {
+            if (--this.batchDepth == 0 && this.metadataPending) {
+                this.metadataPending = false;
+                this.updateMetadata();
+            }
+        }
     }
 
     public void updateMetadata(Player player) {

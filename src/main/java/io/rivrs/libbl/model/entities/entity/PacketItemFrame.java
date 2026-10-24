@@ -36,12 +36,12 @@ public class PacketItemFrame extends PacketEntity {
 
     public void itemStack(ItemStack itemStack) {
         this.itemStack = itemStack;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void rotation(Rotation rotation) {
         this.rotation = rotation;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     @Override

@@ -26,7 +26,7 @@ public class PacketPig extends PacketAnimal {
     public void boost(int boost) {
         this.boost = boost;
 
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
 //    @Override

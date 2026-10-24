@@ -31,7 +31,7 @@ public class PacketGhast extends PacketMob {
 
     public void attacking(boolean attacking) {
         this.attacking = attacking;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     @Override

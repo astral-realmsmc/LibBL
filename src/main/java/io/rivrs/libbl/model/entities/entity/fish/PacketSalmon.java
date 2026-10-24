@@ -46,7 +46,7 @@ public class PacketSalmon extends PacketAbstractFish {
 
     public void size(Size type) {
         this.size = type;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     @Override

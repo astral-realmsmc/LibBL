@@ -32,7 +32,7 @@ public class PacketBee extends PacketAnimal {
 
     public void angerTime(long angerTime) {
         this.angerTime = angerTime;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     @Override

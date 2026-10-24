@@ -32,7 +32,7 @@ public class PacketArrow extends PacketAbstractArrow {
 
     public void color(Color color) {
         this.color = color;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     @Override

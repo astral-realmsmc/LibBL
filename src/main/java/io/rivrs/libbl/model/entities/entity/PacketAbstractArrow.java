@@ -37,12 +37,12 @@ public abstract class PacketAbstractArrow extends PacketEntity {
             throw new IllegalArgumentException("Piercing level must be between 0 and 127");
 
         this.piercingLevel = piercingLevel;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     public void inGround(boolean inGround) {
         this.inGround = inGround;
-        this.sendPacket(this.buildMetadataPacket());
+        this.updateMetadata();
     }
 
     @Override
