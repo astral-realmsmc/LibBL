@@ -5,6 +5,7 @@ import com.github.retrooper.packetevents.event.SimplePacketListenerAbstract;
 import com.github.retrooper.packetevents.event.simple.PacketPlayReceiveEvent;
 import com.github.retrooper.packetevents.protocol.packettype.PacketType;
 import com.github.retrooper.packetevents.protocol.player.InteractionHand;
+import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientAttack;
 import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientInteractEntity;
 import io.rivrs.libbl.LibBL;
 import io.rivrs.libbl.event.entity.PacketEntityAttackEvent;
@@ -31,6 +32,10 @@ public class EntityInteractionListener extends SimplePacketListenerAbstract {
 
     @Override
     public void onPacketPlayReceive(PacketPlayReceiveEvent event) {
+        if (event.getPacketType().equals(PacketType.Play.Client.ATTACK)) {
+            this.onAttack(event);
+            return;
+        }
         if (!event.getPacketType().equals(PacketType.Play.Client.INTERACT_ENTITY))
             return;
 
@@ -64,6 +69,25 @@ public class EntityInteractionListener extends SimplePacketListenerAbstract {
                             new PacketEntityInteractEvent(packetEntity, player, sneaking, hand, PacketEntityInteractEvent.Action.INTERACT, null).callEvent();
                         }
                     }
+                });
+    }
+
+    /**
+     * From 26.1 the client sends attacks as their own packet, which carries neither hand nor
+     * sneaking: an attack is always the main hand, and sneaking is read off the player.
+     */
+    private void onAttack(PacketPlayReceiveEvent event) {
+        WrapperPlayClientAttack packet = new WrapperPlayClientAttack(event);
+        this.plugin.entityService()
+                .findById(packet.getEntityId())
+                .ifPresent(packetEntity -> {
+                    event.setCancelled(true);
+
+                    Player player = event.getPlayer();
+                    if (packetEntity.location().distanceSquared(player.getLocation()) > 25)
+                        return;
+
+                    new PacketEntityAttackEvent(packetEntity, player, player.isSneaking(), MainHand.RIGHT).callEvent();
                 });
     }
 
