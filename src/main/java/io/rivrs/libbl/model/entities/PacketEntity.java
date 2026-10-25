@@ -34,6 +34,7 @@ import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Pose;
 import org.bukkit.inventory.ItemStack;
+import org.jetbrains.annotations.Nullable;
 import org.bukkit.inventory.MainHand;
 import org.bukkit.util.Vector;
 import org.jetbrains.annotations.NotNull;
@@ -399,11 +400,20 @@ public abstract class PacketEntity implements EntityMetadataProvider, ViewerHold
         return this.equipment[type.ordinal()] != null;
     }
 
-    public void equip(EquipmentType type, ItemStack item) {
-        this.equipment[type.ordinal()] = item;
+    /**
+     * Puts the item in the slot and shows it to the viewers. A null or empty item clears the slot:
+     * it is sent as air, so viewers stop drawing what was there. Only that slot is sent: a packet
+     * listing the remaining items would leave the cleared one on the client, and one listing none
+     * cannot be decoded at all (the client disconnects).
+     */
+    public void equip(EquipmentType type, @Nullable ItemStack item) {
+        boolean empty = item == null || item.isEmpty();
+        this.equipment[type.ordinal()] = empty ? null : item;
 
-        if (hasEquipment())
-            sendPacket(buildEquipmentPacket());
+        com.github.retrooper.packetevents.protocol.item.ItemStack sent = empty
+                ? com.github.retrooper.packetevents.protocol.item.ItemStack.EMPTY
+                : SpigotConversionUtil.fromBukkitItemStack(item);
+        sendPacket(new WrapperPlayServerEntityEquipment(this.id, List.of(new Equipment(type.slot(), sent))));
     }
 
     public void addPassenger(PacketEntity entity) {
