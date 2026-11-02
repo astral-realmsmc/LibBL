@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "io.rivrs"
-version = "1.0-ffb-SNAPSHOT"
+version = "1.2"
 
 repositories {
     // PolarisUtils, published with ./gradlew publishToMavenLocal
