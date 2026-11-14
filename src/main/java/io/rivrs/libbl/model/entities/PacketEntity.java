@@ -12,6 +12,8 @@ import com.github.retrooper.packetevents.wrapper.PacketWrapper;
 import com.github.retrooper.packetevents.wrapper.play.server.*;
 import io.github.retrooper.packetevents.util.SpigotConversionUtil;
 import io.github.retrooper.packetevents.util.SpigotReflectionUtil;
+import com.polaris.polarisUtils.api.PolarisUtilsAPI;
+import com.polaris.polarisUtils.api.model.PlayerSnapshot;
 import io.rivrs.libbl.LibBL;
 import io.rivrs.libbl.event.entity.PacketEntityAddViewerEvent;
 import io.rivrs.libbl.event.entity.PacketEntityDespawnEvent;
@@ -25,6 +27,7 @@ import io.rivrs.libbl.model.flag.Flag;
 import io.rivrs.libbl.utils.ParticleUtils;
 import lombok.AccessLevel;
 import lombok.Getter;
+import net.kyori.adventure.key.Key;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -59,15 +62,19 @@ public abstract class PacketEntity implements EntityMetadataProvider, ViewerHold
     // Passengers
     protected final Set<PacketEntity> passengersIds = new CopyOnWriteArraySet<>();
     // Vehicle
-    protected int vehicleId = -1;
-    // Metadata
-    private final Set<Flag> flags = new HashSet<>();
+    protected volatile int vehicleId = -1;
+    // Metadata, read by the visibility task while the owner of the entity edits it
+    private final Set<Flag> flags = ConcurrentHashMap.newKeySet();
     // Attributes
     protected final List<WrapperPlayServerUpdateAttributes.Property> properties = new CopyOnWriteArrayList<>();
     // Velocity
     protected Vector3d velocity;
     // Data
-    protected Location location;
+    /**
+     * Never mutated in place once set: a teleport or a rotation swaps in a new copy, so that the
+     * asynchronous visibility task always reads a consistent position.
+     */
+    protected volatile Location location;
     protected int airTicks = 300;
     protected Component customName = Component.empty();
     protected boolean customNameVisible = false;
@@ -76,14 +83,14 @@ public abstract class PacketEntity implements EntityMetadataProvider, ViewerHold
     protected Pose pose = Pose.STANDING;
     protected int frozenTicks = 0;
     // Viewers
-    protected boolean autoViewable = true;
+    protected volatile boolean autoViewable = true;
     // State
-    protected boolean alive;
+    protected volatile boolean alive;
     /**
      * Whether the visibility task may hide the entity from a player who turned away from it (field
      * of view, line of sight); distance always applies.
      */
-    protected boolean fieldOfViewCulled = true;
+    protected volatile boolean fieldOfViewCulled = true;
 
     // batch(): how deep, and whether a setter asked for the metadata meanwhile
     @Getter(AccessLevel.NONE)
@@ -115,13 +122,22 @@ public abstract class PacketEntity implements EntityMetadataProvider, ViewerHold
                 || !new PacketEntitySpawnEvent(this).callEvent())
             return;
 
-        // Detect nearby players
-        if (this.autoViewable)
-            for (Player player : this.location.getWorld().getPlayers()) {
-                if (player.getLocation().distanceSquared(this.location) <= LibBL.ENTITY_SIMULATION_DISTANCE_SQR()
+        // Detect nearby players, from their snapshots: spawn() is called from any thread, which on
+        // Folia rarely owns the players around, so their live location cannot be read here
+        if (this.autoViewable) {
+            Location location = this.location;
+            Key world = location.getWorld().key();
+            for (PlayerSnapshot snapshot : PolarisUtilsAPI.get().snapshots()) {
+                if (!snapshot.isInWorld(world)
+                        || snapshot.distanceSquared(location.getX(), location.getY(), location.getZ()) > LibBL.ENTITY_SIMULATION_DISTANCE_SQR())
+                    continue;
+
+                Player player = Bukkit.getPlayer(snapshot.uniqueId());
+                if (player != null
                         && new PacketEntityAddViewerEvent(this, player, PacketEntityAddViewerEvent.Reason.ENTITY_SPAWN).callEvent())
                     this.viewers.add(player.getUniqueId());
             }
+        }
 
         // Mark as alive
         this.alive = true;
@@ -147,7 +163,7 @@ public abstract class PacketEntity implements EntityMetadataProvider, ViewerHold
         if (this.hasEquipment())
             packets.add(this.buildEquipmentPacket());
         // Passengers packet has to be sent after the entity spawn packet, otherwise it won't work
-        Bukkit.getScheduler().runTaskAsynchronously(LibBL.get(), () -> {
+        Bukkit.getAsyncScheduler().runNow(LibBL.get(), _ -> {
             if (this.hasPassengers()) {
                 this.sendPacket(player, this.buildSetPassengersPacket());
             }
@@ -155,7 +171,7 @@ public abstract class PacketEntity implements EntityMetadataProvider, ViewerHold
                 this.sendPacket(player, this.buildAttributePacket());
             }
             if(this.vehicleId != -1){
-                this.sendPacket(player, this.buildSetVehiclePacket());
+                this.sendVehiclePacket(packet -> this.sendPacket(player, packet));
             }
         });
         if (velocity != null)
@@ -188,17 +204,25 @@ public abstract class PacketEntity implements EntityMetadataProvider, ViewerHold
     }
 
     public void rotate(float yaw, float pitch) {
-        this.location.setYaw(yaw);
-        this.location.setPitch(pitch);
+        this.location = this.rotated(yaw, pitch);
 
         this.sendPacket(this.buildRotationPacket());
     }
 
     public void rotate(Player player, float yaw, float pitch) {
-        this.location.setYaw(yaw);
-        this.location.setPitch(pitch);
+        this.location = this.rotated(yaw, pitch);
 
         this.sendPacket(player, this.buildRotationPacket());
+    }
+
+    /**
+     * A copy of the location facing the given way, see {@link #location}.
+     */
+    private Location rotated(float yaw, float pitch) {
+        Location rotated = this.location.clone();
+        rotated.setYaw(yaw);
+        rotated.setPitch(pitch);
+        return rotated;
     }
 
     public void despawn() {
@@ -245,8 +269,43 @@ public abstract class PacketEntity implements EntityMetadataProvider, ViewerHold
         return packets;
     }
 
+    /**
+     * Builds the vehicle packet reading the passengers of the real vehicle, which on Folia only the
+     * region owning the vehicle may do. Prefer {@link #sendVehiclePacket(Consumer)}, which hops there.
+     */
     protected WrapperPlayServerSetPassengers buildSetVehiclePacket() {
-        Entity vehicle = SpigotConversionUtil.getEntityById(location.getWorld(), this.vehicleId);
+        return this.buildSetVehiclePacket(this.vehicle());
+    }
+
+    /**
+     * The real entity this one rides, looked up by id: safe from any thread, unlike reading it.
+     */
+    protected @Nullable Entity vehicle() {
+        Location location = this.location;
+        if (this.vehicleId == -1 || location == null || location.getWorld() == null)
+            return null;
+        return SpigotConversionUtil.getEntityById(location.getWorld(), this.vehicleId);
+    }
+
+    /**
+     * Builds the vehicle packet, then hands it to {@code sender} from the thread owning the vehicle:
+     * its passengers are read there. With no real vehicle the packet only lists this entity, and is
+     * handed over straight away. Nothing is sent when the vehicle is removed in the meantime.
+     */
+    protected void sendVehiclePacket(Consumer<PacketWrapper<?>> sender) {
+        Entity vehicle = this.vehicle();
+        if (vehicle == null || Bukkit.isOwnedByCurrentRegion(vehicle)) {
+            sender.accept(this.buildSetVehiclePacket(vehicle));
+            return;
+        }
+
+        vehicle.getScheduler().run(LibBL.get(), _ -> sender.accept(this.buildSetVehiclePacket(vehicle)), null);
+    }
+
+    /**
+     * @param vehicle the real vehicle, whose passengers are read: call it from the thread owning it
+     */
+    protected WrapperPlayServerSetPassengers buildSetVehiclePacket(@Nullable Entity vehicle) {
         int[] passengers = new int[]{this.id};
         if(vehicle != null){
             List<Entity> passengerEntities = vehicle.getPassengers();
@@ -263,12 +322,12 @@ public abstract class PacketEntity implements EntityMetadataProvider, ViewerHold
 
     public void setVehicleId(Player player, int id) {
         this.vehicleId = id;
-        this.sendPacket(player, buildSetVehiclePacket());
+        this.sendVehiclePacket(packet -> this.sendPacket(player, packet));
     }
 
     public void setVehicleId(int id) {
         this.vehicleId = id;
-        this.sendPacket(buildSetVehiclePacket());
+        this.sendVehiclePacket(this::sendPacket);
     }
 
     protected WrapperPlayServerUpdateAttributes buildAttributePacket() {
@@ -434,7 +493,7 @@ public abstract class PacketEntity implements EntityMetadataProvider, ViewerHold
     }
 
     public void rotateHead(Player player, float yaw) {
-        this.location.setYaw(yaw);
+        this.location = this.rotated(yaw, this.location.getPitch());
         this.sendPacket(player, new WrapperPlayServerEntityHeadLook(
                 this.id,
                 yaw
@@ -442,7 +501,7 @@ public abstract class PacketEntity implements EntityMetadataProvider, ViewerHold
     }
 
     public void rotateHead(float yaw) {
-        this.location.setYaw(yaw);
+        this.location = this.rotated(yaw, this.location.getPitch());
         this.sendPacket(new WrapperPlayServerEntityHeadLook(
                 this.id,
                 yaw
@@ -549,7 +608,9 @@ public abstract class PacketEntity implements EntityMetadataProvider, ViewerHold
                 || !new PacketEntityAddViewerEvent(this, player, PacketEntityAddViewerEvent.Reason.PLUGIN).callEvent())
             return;
 
-        this.viewers.add(player.getUniqueId());
+        // Another thread may have added the same viewer meanwhile, only one of them spawns the entity
+        if (!this.viewers.add(player.getUniqueId()))
+            return;
 
         LinkedList<PacketWrapper<?>> packets = this.buildSpawnPackets(player);
         for (PacketWrapper<?> packet : packets) {
@@ -563,7 +624,8 @@ public abstract class PacketEntity implements EntityMetadataProvider, ViewerHold
                 || !new PacketEntityRemoveViewerEvent(this, viewer, PacketEntityRemoveViewerEvent.Reason.PLUGIN).callEvent())
             return;
 
-        this.viewers.remove(viewer.getUniqueId());
+        if (!this.viewers.remove(viewer.getUniqueId()))
+            return;
 
         LinkedList<PacketWrapper<?>> packets = this.buildDestroyPackets();
         for (PacketWrapper<?> packet : packets) {
@@ -789,7 +851,7 @@ public abstract class PacketEntity implements EntityMetadataProvider, ViewerHold
     }
 
     public void addScheduledAction(long time, Consumer<PacketEntity> consumer) {
-        this.consumers.computeIfAbsent(time, k -> new HashSet<>()).add(consumer);
+        this.consumers.computeIfAbsent(time, k -> ConcurrentHashMap.newKeySet()).add(consumer);
     }
 
     public void processScheduledActions(long now){
