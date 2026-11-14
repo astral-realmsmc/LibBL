@@ -5,6 +5,8 @@ import io.rivrs.libbl.model.entities.PacketEntity;
 import io.rivrs.libbl.task.EntityVisibilityTask;
 import lombok.RequiredArgsConstructor;
 import net.kyori.adventure.key.Key;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
+import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -41,13 +43,15 @@ public class EntityService {
      */
     private final Map<Integer, IndexedChunk> indexedIn = new ConcurrentHashMap<>();
     private EntityVisibilityTask visibilityTask;
+    private ScheduledTask visibilityHandle;
 
     private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
     private ScheduledFuture<?> updateLoopFuture;
 
     public void init() {
         this.visibilityTask = new EntityVisibilityTask(this.plugin, this);
-        this.visibilityTask.runTaskTimerAsynchronously(this.plugin, 0, 5);
+        // Every 250 ms, as the 5 ticks it used to run at. Snapshot only, see EntityVisibilityTask
+        this.visibilityHandle = Bukkit.getAsyncScheduler().runAtFixedRate(this.plugin, _ -> this.visibilityTask.run(), 50L, 250L, TimeUnit.MILLISECONDS);
         updateLoopFuture = executor.scheduleAtFixedRate(() -> {
             try {
                 byId.values().forEach(entity -> entity.processScheduledActions(System.currentTimeMillis()));
@@ -62,7 +66,8 @@ public class EntityService {
         this.byUniqueId.clear();
         this.byChunk.clear();
         this.indexedIn.clear();
-        this.visibilityTask.cancel();
+        if (this.visibilityHandle != null)
+            this.visibilityHandle.cancel();
     }
 
     public void register(PacketEntity entity) {

@@ -7,12 +7,15 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
 import com.github.retrooper.packetevents.PacketEvents;
 
 import io.rivrs.libbl.LibBL;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import io.rivrs.libbl.task.ViewerUpdateTask;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -24,10 +27,12 @@ public class ViewerService {
     private final LibBL plugin;
     private final Map<UUID, Object> playerChannels = new ConcurrentHashMap<>();
     private ViewerUpdateTask viewerUpdateTask;
+    private ScheduledTask viewerUpdateHandle;
 
     public void init() {
         this.viewerUpdateTask = new ViewerUpdateTask(this);
-        this.viewerUpdateTask.runTaskTimerAsynchronously(this.plugin, 0, 200L);
+        // Every 10 seconds, as the 200 ticks it used to run at
+        this.viewerUpdateHandle = Bukkit.getAsyncScheduler().runAtFixedRate(this.plugin, _ -> this.viewerUpdateTask.run(), 50L, 10_000L, TimeUnit.MILLISECONDS);
     }
 
     public Object getPlayerChannel(UUID uuid) {
@@ -65,7 +70,8 @@ public class ViewerService {
     }
 
     public void shutdown() {
-        this.viewerUpdateTask.cancel();
+        if (this.viewerUpdateHandle != null)
+            this.viewerUpdateHandle.cancel();
         this.playerChannels.clear();
     }
 }

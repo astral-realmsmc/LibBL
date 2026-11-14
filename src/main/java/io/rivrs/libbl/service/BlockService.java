@@ -17,6 +17,7 @@ import io.rivrs.libbl.model.block.FakeBlock;
 import io.rivrs.libbl.model.block.ViewerCandidate;
 import io.rivrs.libbl.utils.BlockPos;
 import io.rivrs.libbl.utils.ThreadSafeLong2ObjectMap;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import lombok.RequiredArgsConstructor;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
@@ -25,12 +26,12 @@ import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitRunnable;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 @RequiredArgsConstructor
 public class BlockService {
@@ -46,18 +47,18 @@ public class BlockService {
 
     private final ConcurrentHashMap<BlockData, Integer> dataStateCache = new ConcurrentHashMap<>();
 
-    BukkitRunnable cleanupTask = new BukkitRunnable() {
-        @Override
-        public void run() {
-            cleanUp();
-        }
-    };
+    /// Drops the blocks of the worlds that were unloaded. Only touches the maps above and
+    /// [Bukkit#getWorld(String)], so it runs on the async scheduler.
+    private ScheduledTask cleanupTask;
 
     public void init() {
-        this.cleanupTask.runTaskTimerAsynchronously(this.plugin, 0, 200L);
+        // Every 10 seconds, as the 200 ticks it used to run at
+        this.cleanupTask = Bukkit.getAsyncScheduler().runAtFixedRate(this.plugin, _ -> cleanUp(), 50L, 10_000L, TimeUnit.MILLISECONDS);
     }
 
     public void shutdown() {
+        if (this.cleanupTask != null)
+            this.cleanupTask.cancel();
         this.fakeBlocks.clear();
     }
 

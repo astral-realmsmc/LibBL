@@ -9,7 +9,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitRunnable;
 import org.jetbrains.annotations.Nullable;
 
 import com.polaris.polarisUtils.api.PolarisUtilsAPI;
@@ -29,11 +28,14 @@ import net.kyori.adventure.key.Key;
  * entities of the chunks within simulation distance ({@link EntityService#near}), so the cost grows
  * with what is around players rather than with every entity times every player.
  * <p>
- * The whole check runs off the main thread: player positions come from {@link PlayerSnapshot}s and
- * blocks from the chunk cache of PolarisUtils, no Bukkit world state is touched.
+ * The whole check runs on the async scheduler: player positions come from {@link PlayerSnapshot}s and
+ * blocks from the chunk cache of PolarisUtils, no Bukkit world state is touched, so a single task
+ * serves every region on Folia. Viewers are added and removed from that thread, so the
+ * {@link io.rivrs.libbl.event.entity.PacketEntityAddViewerEvent} and
+ * {@link io.rivrs.libbl.event.entity.PacketEntityRemoveViewerEvent} it causes are asynchronous.
  */
 @RequiredArgsConstructor
-public class EntityVisibilityTask extends BukkitRunnable {
+public class EntityVisibilityTask implements Runnable {
 
     private final LibBL plugin;
     private final EntityService service;
