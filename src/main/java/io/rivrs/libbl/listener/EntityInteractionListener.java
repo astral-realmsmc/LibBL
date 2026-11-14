@@ -7,10 +7,14 @@ import com.github.retrooper.packetevents.protocol.packettype.PacketType;
 import com.github.retrooper.packetevents.protocol.player.InteractionHand;
 import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientAttack;
 import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientInteractEntity;
+import com.polaris.polarisUtils.api.PolarisUtilsAPI;
+import com.polaris.polarisUtils.api.model.PlayerSnapshot;
 import io.rivrs.libbl.LibBL;
 import io.rivrs.libbl.event.entity.PacketEntityAttackEvent;
 import io.rivrs.libbl.event.entity.PacketEntityInteractEvent;
+import io.rivrs.libbl.model.entities.PacketEntity;
 import lombok.RequiredArgsConstructor;
+import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.MainHand;
 
@@ -18,6 +22,11 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Turns the clicks on packet entities into {@link PacketEntityAttackEvent}s and
+ * {@link PacketEntityInteractEvent}s. Both are fired asynchronously, from the Netty thread of the
+ * player: a listener touching the world has to hop onto the player's scheduler first.
+ */
 @RequiredArgsConstructor
 public class EntityInteractionListener extends SimplePacketListenerAbstract {
 
@@ -47,7 +56,7 @@ public class EntityInteractionListener extends SimplePacketListenerAbstract {
 
                     Player player = event.getPlayer();
 
-                    if (packetEntity.location().distanceSquared(player.getLocation()) > 25) {
+                    if (!this.inReach(player, packetEntity)) {
                         // Too far away, the packet is likely spoofed and we ignore it
                         return;
                     }
@@ -84,11 +93,25 @@ public class EntityInteractionListener extends SimplePacketListenerAbstract {
                     event.setCancelled(true);
 
                     Player player = event.getPlayer();
-                    if (packetEntity.location().distanceSquared(player.getLocation()) > 25)
+                    if (!this.inReach(player, packetEntity))
                         return;
 
                     new PacketEntityAttackEvent(packetEntity, player, player.isSneaking(), MainHand.RIGHT).callEvent();
                 });
+    }
+
+    /**
+     * Whether the player stands within 5 blocks of the entity, read off its snapshot: the packet
+     * comes in on Netty, which does not own the player on Folia.
+     */
+    private boolean inReach(Player player, PacketEntity entity) {
+        Location location = entity.location();
+        PlayerSnapshot snapshot = PolarisUtilsAPI.get().snapshot(player.getUniqueId()).orElse(null);
+        return snapshot != null
+               && location != null
+               && location.getWorld() != null
+               && snapshot.isInWorld(location.getWorld().key())
+               && snapshot.distanceSquared(location.getX(), location.getY(), location.getZ()) <= 25;
     }
 
     @Override

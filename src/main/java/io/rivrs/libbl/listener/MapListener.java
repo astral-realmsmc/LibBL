@@ -26,6 +26,13 @@ import org.bukkit.inventory.MainHand;
 import java.util.ArrayList;
 import java.util.List;
 
+/// Writes the fake blocks into the chunk and block packets, and turns the clicks on them into
+/// [FakeBlockInteractEvent]s and [FakeBlockBreakEvent]s.
+///
+/// Everything here runs on the Netty thread of the player, so both events are asynchronous: a
+/// listener touching the world has to hop onto the player's scheduler first. The world of the player
+/// is read with [Player#getWorld()], a plain field read that Folia allows from any thread and that,
+/// unlike a snapshot, is already up to date when the chunks of a new world are sent.
 @RequiredArgsConstructor
 public class MapListener implements PacketListener {
 
