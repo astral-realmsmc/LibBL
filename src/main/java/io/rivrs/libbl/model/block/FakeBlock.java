@@ -327,6 +327,10 @@ public class FakeBlock implements ViewerHolder {
 
     @Override
     public void addViewer(Player player) {
+        // A player whose connection is not registered yet (still joining) is picked up by the next visibility pass
+        if (LibBL.get().viewerService().getPlayerChannel(player.getUniqueId()) == null)
+            return;
+
         if (this.isViewer(player)
                 || !new FakeBlockAddViewerEvent(this, player, FakeBlockAddViewerEvent.Reason.PLUGIN).callEvent())
             return;

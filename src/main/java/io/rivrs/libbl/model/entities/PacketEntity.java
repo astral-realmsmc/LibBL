@@ -604,6 +604,10 @@ public abstract class PacketEntity implements EntityMetadataProvider, ViewerHold
     // Viewers
     @Override
     public void addViewer(Player player) {
+        // A player whose connection is not registered yet (still joining) is picked up by the next visibility pass
+        if (LibBL.get().viewerService().getPlayerChannel(player.getUniqueId()) == null)
+            return;
+
         if (this.isViewer(player)
                 || !new PacketEntityAddViewerEvent(this, player, PacketEntityAddViewerEvent.Reason.PLUGIN).callEvent())
             return;
