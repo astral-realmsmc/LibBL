@@ -18,6 +18,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.stream.Collectors;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.command.CommandSender;
@@ -156,7 +157,7 @@ public class SchematicCommand {
         String name = StringArgumentType.getString(context, "file");
         sender.sendRichMessage("<gray>Reading <white>%s<gray>...".formatted(name));
 
-        this.read(name).whenComplete((read, throwable) -> this.onMainThread(() -> {
+        this.read(name).whenComplete((read, throwable) -> this.onRegionOf(location, () -> {
             if (throwable != null) {
                 sender.sendRichMessage("<red>Could not read %s : %s".formatted(name, message(throwable)));
                 return;
@@ -200,7 +201,7 @@ public class SchematicCommand {
         CommandSender sender = context.getSource().getSender();
         String name = StringArgumentType.getString(context, "file");
 
-        this.read(name).whenComplete((read, throwable) -> this.onMainThread(() -> {
+        this.read(name).whenComplete((read, throwable) -> this.onGlobalThread(() -> {
             if (throwable != null) {
                 sender.sendRichMessage("<red>Could not read %s : %s".formatted(name, message(throwable)));
                 return;
@@ -398,17 +399,30 @@ public class SchematicCommand {
         return builder.buildFuture();
     }
 
-    /// Fake blocks fire events and touch the block service, both of which belong to the main thread.
-    private void onMainThread(Runnable action) {
+    /// Fake blocks fire events, which listeners expect from the region the blocks are in: the paste
+    /// runs on the region owning its location, the main thread on Paper.
+    private void onRegionOf(Location location, Runnable action) {
         // The read may well outlive a reload, there is nothing to paste into anymore
         if (!this.plugin.isEnabled())
             return;
 
-        if (this.plugin.getServer().isPrimaryThread()) {
+        if (Bukkit.isOwnedByCurrentRegion(location)) {
             action.run();
             return;
         }
-        this.plugin.getServer().getScheduler().runTask(this.plugin, action);
+        Bukkit.getRegionScheduler().execute(this.plugin, location, action);
+    }
+
+    /// Runs what touches no world on the global region, the main thread on Paper.
+    private void onGlobalThread(Runnable action) {
+        if (!this.plugin.isEnabled())
+            return;
+
+        if (Bukkit.isGlobalTickThread()) {
+            action.run();
+            return;
+        }
+        Bukkit.getGlobalRegionScheduler().execute(this.plugin, action);
     }
 
     /// Prints where the time of a paste went, phase by phase, and what keeping it around costs.
