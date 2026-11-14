@@ -2,11 +2,13 @@ package io.rivrs.libbl.listener;
 
 import com.github.retrooper.packetevents.event.PacketListenerPriority;
 import com.github.retrooper.packetevents.event.SimplePacketListenerAbstract;
+import com.github.retrooper.packetevents.event.UserDisconnectEvent;
 import com.github.retrooper.packetevents.event.simple.PacketPlayReceiveEvent;
 import com.github.retrooper.packetevents.protocol.packettype.PacketType;
 import com.github.retrooper.packetevents.protocol.player.InteractionHand;
 import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientAttack;
 import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientInteractEntity;
+import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientPlayerInput;
 import com.polaris.polarisUtils.api.PolarisUtilsAPI;
 import com.polaris.polarisUtils.api.model.PlayerSnapshot;
 import io.rivrs.libbl.LibBL;
@@ -19,6 +21,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.MainHand;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -38,9 +41,18 @@ public class EntityInteractionListener extends SimplePacketListenerAbstract {
 
     private final LibBL plugin;
     private final Map<UUID, InteractAt> lastInteractAt = new ConcurrentHashMap<>();
+    /**
+     * The players holding sneak, as their client last said. {@code Player#isSneaking()} cannot be
+     * read from Netty on Folia, it goes through the entity handle.
+     */
+    private final Set<UUID> sneaking = ConcurrentHashMap.newKeySet();
 
     @Override
     public void onPacketPlayReceive(PacketPlayReceiveEvent event) {
+        if (event.getPacketType().equals(PacketType.Play.Client.PLAYER_INPUT)) {
+            this.onInput(event);
+            return;
+        }
         if (event.getPacketType().equals(PacketType.Play.Client.ATTACK)) {
             this.onAttack(event);
             return;
@@ -81,9 +93,30 @@ public class EntityInteractionListener extends SimplePacketListenerAbstract {
                 });
     }
 
+    private void onInput(PacketPlayReceiveEvent event) {
+        UUID uniqueId = event.getUser().getUUID();
+        if (uniqueId == null)
+            return;
+
+        if (new WrapperPlayClientPlayerInput(event).isShift())
+            this.sneaking.add(uniqueId);
+        else
+            this.sneaking.remove(uniqueId);
+    }
+
+    @Override
+    public void onUserDisconnect(UserDisconnectEvent event) {
+        UUID uniqueId = event.getUser().getUUID();
+        if (uniqueId == null)
+            return;
+
+        this.sneaking.remove(uniqueId);
+        this.lastInteractAt.remove(uniqueId);
+    }
+
     /**
      * From 26.1 the client sends attacks as their own packet, which carries neither hand nor
-     * sneaking: an attack is always the main hand, and sneaking is read off the player.
+     * sneaking: an attack is always the main hand, and sneaking comes from the last input packet.
      */
     private void onAttack(PacketPlayReceiveEvent event) {
         WrapperPlayClientAttack packet = new WrapperPlayClientAttack(event);
@@ -96,7 +129,7 @@ public class EntityInteractionListener extends SimplePacketListenerAbstract {
                     if (!this.inReach(player, packetEntity))
                         return;
 
-                    new PacketEntityAttackEvent(packetEntity, player, player.isSneaking(), MainHand.RIGHT).callEvent();
+                    new PacketEntityAttackEvent(packetEntity, player, this.sneaking.contains(player.getUniqueId()), MainHand.RIGHT).callEvent();
                 });
     }
 
