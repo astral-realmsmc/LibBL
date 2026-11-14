@@ -300,15 +300,7 @@ public class BlockService {
     }
 
     private static List<ViewerCandidate> gatherCandidates(String worldName) {
-        World world = Bukkit.getWorld(worldName);
-        if (world == null)
-            return List.of();
-
-        List<ViewerCandidate> candidates = new ArrayList<>();
-        for (Player player : world.getPlayers())
-            candidates.add(ViewerCandidate.of(player));
-
-        return candidates;
+        return ViewerCandidate.gather(Bukkit.getWorld(worldName));
     }
 
     /// Removes every given block at once, batching the packets of the blocks sharing a chunk section.

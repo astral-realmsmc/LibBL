@@ -16,14 +16,12 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import org.apache.logging.log4j.util.InternalApi;
 import org.bukkit.*;
-import org.bukkit.block.Block;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Unmodifiable;
 
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -52,9 +50,10 @@ public class FakeBlock implements ViewerHolder {
     /// The block position packed into a long, see [BlockPos].
     private final long positionKey;
     private final String worldName;
-    private boolean autoViewable = true;
-    private int stateID;
-    private boolean placed;
+    // Read by the packet listeners on the Netty threads
+    private volatile boolean autoViewable = true;
+    private volatile int stateID;
+    private volatile boolean placed;
 
     /// Created on demand, most fake blocks never get dug at and an empty map per block adds up fast.
     @Getter(AccessLevel.NONE)
@@ -155,13 +154,8 @@ public class FakeBlock implements ViewerHolder {
     /// @return whether the block was placed by this call, and its viewers have to be told about it
     @InternalApi
     public boolean preparePlace() {
-        World world = this.world;
-        List<ViewerCandidate> candidates = new ArrayList<>();
-        if (world != null)
-            for (Player player : world.getPlayers())
-                candidates.add(ViewerCandidate.of(player));
-
-        return this.preparePlace(candidates, true);
+        // From the player snapshots: placing runs on any thread, see ViewerCandidate
+        return this.preparePlace(ViewerCandidate.gather(this.world), true);
     }
 
     /// @param candidates the players that may see the block, gathered once by the caller rather than
@@ -283,6 +277,9 @@ public class FakeBlock implements ViewerHolder {
     /// This methode will attempt to put back what the server know should be at the fakeBlock position.
     ///
     /// The methode is way slower / way laggier than using remove(BlockData), use at your own risks !
+    ///
+    /// The chunk is loaded asynchronously, then the real block is read on the region owning it (the
+    /// main thread on Paper), where the removal happens too.
     public void smartRemove() {
         Location location = this.location();
         if (!location.isWorldLoaded()) {
@@ -290,12 +287,20 @@ public class FakeBlock implements ViewerHolder {
             return;
         }
 
-        CompletableFuture<Chunk> completableFuture = this.world.getChunkAtAsyncUrgently(location);
-        completableFuture.thenAcceptAsync(chunk -> {
-            // Chunk#getBlock takes coordinates relative to the chunk, not to the world
-            Block block = chunk.getBlock(this.blockX() & 15, this.blockY(), this.blockZ() & 15);
-            remove(block.getBlockData());
+        int chunkX = this.blockX() >> 4;
+        int chunkZ = this.blockZ() >> 4;
+        this.world.getChunkAtAsyncUrgently(chunkX, chunkZ).thenAccept(_ -> {
+            if (Bukkit.isOwnedByCurrentRegion(this.world, chunkX, chunkZ)) {
+                this.removeToRealBlock();
+                return;
+            }
+            Bukkit.getRegionScheduler().run(LibBL.get(), this.world, chunkX, chunkZ, _ -> this.removeToRealBlock());
         });
+    }
+
+    /// Shows the viewers the block the server holds at this position. Only from the region owning it.
+    private void removeToRealBlock() {
+        this.remove(this.world.getBlockData(this.blockX(), this.blockY(), this.blockZ()));
     }
 
     protected WrapperPlayServerBlockChange buildRemovePacket(BlockData blockData) {
